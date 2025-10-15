@@ -170,7 +170,7 @@ class TestScriptArgs(unittest.TestCase):
         self.assertIn('5', args)
         self.assertIn('--extrude-above', args)
         self.assertIn('0.05', args)
-        self.assertIn('--enable-borders', args)
+        self.assertIn('--enable-border', args)
         self.assertIn('--disable-cities', args)
 
     def test_build_script_args_borders_disabled(self):
@@ -185,7 +185,7 @@ class TestScriptArgs(unittest.TestCase):
 
         args = build_script_args(config)
 
-        self.assertIn('--disable-borders', args)
+        self.assertIn('--disable-border', args)
         self.assertNotIn('--border-width', args)
         self.assertNotIn('--border-height', args)
 

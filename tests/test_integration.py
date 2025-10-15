@@ -35,7 +35,7 @@ class TestProjectStructure(unittest.TestCase):
 
     def test_main_launcher_exists(self):
         """Test that main launcher exists"""
-        self.assertTrue((self.project_root / 'run.py').exists())
+        self.assertTrue((self.project_root / 'main.py').exists())
 
     def test_blender_runner_exists(self):
         """Test that blender_runner module exists"""
@@ -116,9 +116,9 @@ class TestConfigIntegration(unittest.TestCase):
 
             # Verify boolean flags
             if config['enable_borders']:
-                self.assertIn('--enable-borders', args)
+                self.assertIn('--enable-border', args)
             else:
-                self.assertIn('--disable-borders', args)
+                self.assertIn('--disable-border', args)
 
             if config['enable_cities']:
                 self.assertIn('--enable-cities', args)
@@ -140,10 +140,10 @@ class TestImports(unittest.TestCase):
 
     def test_launcher_imports(self):
         """Test that launcher can import blender_runner"""
-        launcher_path = Path(__file__).parent.parent / 'run.py'
+        launcher_path = Path(__file__).parent.parent / 'main.py'
 
-        # Read launcher file
-        with open(launcher_path, 'r') as f:
+        # Read launcher file with proper encoding
+        with open(launcher_path, 'r', encoding='utf-8') as f:
             content = f.read()
 
         # Check for proper imports

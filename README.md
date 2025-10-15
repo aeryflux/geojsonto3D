@@ -1,6 +1,6 @@
 # GeoJSON to 3D Globe
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
 ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)
 
@@ -23,7 +23,7 @@ Convert GeoJSON geographic data into interactive 3D globe models using Blender.
 
 ```bash
 # Run the application
-python run.py
+python main.py
 ```
 
 On first launch:
@@ -35,57 +35,57 @@ On first launch:
 ### Quality Presets
 
 ```bash
-# Fast test (~30 seconds)
-python run.py --preset low
+# Fast test (quick check)
+python main.py --preset low
 
-# Balanced quality (~1-2 minutes)
-python run.py --preset medium
+# Balanced quality
+python main.py --preset medium
 
-# High quality (~3-5 minutes)
-python run.py --preset high
+# High quality (portfolio-ready)
+python main.py --preset high
 
-# Maximum quality (~10-20 minutes)
-python run.py --preset ultra
+# Maximum quality
+python main.py --preset ultra
 ```
 
 ### Advanced Options
 
 ```bash
 # Run with Blender GUI visible
-python run.py --gui
+python main.py --gui
 
 # Reconfigure all settings
-python run.py --configure
+python main.py --configure
 
 # Specify custom Blender path
-python run.py --blender "C:\Program Files\Blender Foundation\Blender 4.4\blender.exe"
+python main.py --blender "C:\Program Files\Blender Foundation\Blender 4.4\blender.exe"
 
 # Show help
-python run.py --help
+python main.py --help
 ```
 
 ### Preset Details
 
-| Preset | ICO_SUBDIV | Faces | Time | Use Case |
-|--------|------------|-------|------|----------|
-| low    | 3          | 642   | ~30s | Quick testing |
-| medium | 4          | 2,562 | ~1-2min | Development |
-| high   | 5          | 10,242| ~3-5min | Production |
-| ultra  | 6          | 40,962| ~10-20min | Maximum detail |
+| Preset | ICO_SUBDIV | Use Case |
+|--------|------------|----------|
+| low    | 3          | Quick testing |
+| medium | 5          | Development |
+| high   | 7          | Production (portfolio) |
+| ultra  | 7          | Production (heavier borders) |
 
 ### Custom Configuration
 
 When choosing "custom" during interactive setup, you can configure:
 
-- **ICO_SUBDIV** (3-7): Globe subdivision level - higher = more detail, slower generation
-- **Extrusion** (0.0-0.1): Country height above surface
+- **ICO_SUBDIV** (3-7): Globe subdivision level
+- **Extrusion** (0.0-0.1): Country height above surface (default 0.1 above, 0.0 below)
 - **Borders**: Enable/disable 3D country borders
 - **Cities**: Enable/disable city markers (significantly slower)
 
 ## Features
 
 - 🌍 Spherical projection of GeoJSON polygons onto 3D globe
-- 📊 Bidirectional radial extrusion (countries rise above and below surface)
+- 📊 Radial extrusion aligned to base sphere (above by default)
 - 🎨 Automatic 3D border generation with anti-z-fighting
 - 🎯 Support for complex MultiPolygon geometries
 - 📦 GLB export for web/game engines
@@ -107,14 +107,15 @@ When choosing "custom" during interactive setup, you can configure:
 
 3. **Run the application**
    ```bash
-   python run.py
+   python main.py
    ```
 
 ## Project Structure
 
 ```
 geojsonto3D/
-├── run.py                              # Main launcher (run this)
+├── main.py                             # Main launcher (run this)
+├── blender_script.py                   # Blender script (legacy, updated version in src/)
 ├── README.md                           # This file
 │
 ├── src/                                # Source code
@@ -126,7 +127,7 @@ geojsonto3D/
 │   └── ne_50m_populated_places.json
 │
 └── res/                                # Generated 3D models (output)
-    └── atlas_ico_subdiv_*.glb         # Auto-created
+  └── atlas_ico_subdiv_*.glb         # Auto-created
 ```
 
 ## Configuration
@@ -142,20 +143,87 @@ Delete these files to reset configuration.
 ### Technical Parameters
 
 - `ICO_SUBDIV`: Icosphere subdivision level (affects quality and performance)
-- `EXTRUDE_ABOVE`: Outward extrusion depth (country height)
-- `EXTRUDE_BELOW`: Inward extrusion depth
+- `EXTRUDE_ABOVE_COUNTRY`: Outward extrusion depth for countries
+- `EXTRUDE_BELOW_COUNTRY`: Inward extrusion depth for countries
+- `EXTRUDE_ABOVE_CITY`: Outward extrusion depth for cities
+- `EXTRUDE_BELOW_CITY`: Inward extrusion depth for cities
 - `BORDER_WIDTH`: Border ribbon width
 - `BORDER_HEIGHT`: Border ribbon height
-- `ENABLE_BORDERS`: Toggle country borders
+- `ENABLE_COUNTRIES`: Toggle country rendering
 - `ENABLE_CITIES`: Toggle city markers
+- `ENABLE_COUNTRY_BORDERS`: Toggle country borders
+- `ENABLE_CITY_BORDERS`: Toggle city borders
+- `INVERT_POLES`: Invert globe orientation (Antarctica at bottom)
+
+### Configuration File Output
+
+The generator now creates a configuration file alongside the GLB model:
+
+```json
+{
+  "generated_at": "2025-10-12T09:10:25",
+  "ico_subdiv": 7,
+  "radius": 1.0,
+  "invert_poles": true,
+  "extrusions": {
+    "country": {
+      "above": 0.0,
+      "below": 0.0
+    },
+    "city": {
+      "above": 0.0,
+      "below": 0.0
+    }
+  },
+  "border": {
+    "width": 0.0006,
+    "height": 0.0025,
+    "zfight_eps": 8e-05
+  },
+  "counts": {
+    "countries": 374,
+    "cities": 1106
+  }
+}
+```
+
+This configuration can be used by applications consuming the 3D globe to understand the model parameters and adjust rendering accordingly.
 
 ## Output
 
 Generated GLB files are saved to `res/` directory:
-- `atlas_ico_subdiv_3.glb` - Low quality
-- `atlas_ico_subdiv_4.glb` - Medium quality
-- `atlas_ico_subdiv_5.glb` - High quality
-- `atlas_ico_subdiv_6.glb` - Ultra quality
+- `atlas_ico_subdiv_3.glb` - Low
+- `atlas_ico_subdiv_5.glb` - Medium
+- `atlas_ico_subdiv_7.glb` - High/Ultra
+
+### Mesh naming convention
+
+Exported object names follow a simple, stable pattern to make it easy for consuming apps to identify elements:
+
+- Globe base: `GlobeFill`
+- Countries: `country_{name}`
+- Borders: `border_{name}` (generated from the corresponding country name)
+- Cities: `city_{cityName}_{index}` (if enabled; triangular prism markers)
+- Closings: `closing_{cityName}_{index}` (per-city triangular ribbon above each city marker’s top face)
+
+Notes:
+- Previous versions produced borders named like `border_country_{name}`. This has been simplified to `border_{name}`.
+- There are no separate wall objects emitted; if you need walls, create them from country meshes in your pipeline.
+- Mobile builds typically hide cities/closings; web/desktop can toggle them at runtime (see below).
+
+Terminology:
+- “Border” refers to country borders (ribbons along country top edges): `border_{countryName}`.
+- “Closing” refers to the thin ribbon around a city’s top face. We keep a distinct name (`closing_…`) to differentiate it from country borders in runtime code and styling.
+
+### Feature flags
+
+Generation flags (CLI):
+- `--enable-border` / `--disable-border`
+- `--enable-closing` / `--disable-closing`
+- `--enable-cities` / `--disable-cities`
+
+Presets default to: low/medium (cities off, closings off), high/ultra (cities on, closings on).
+Note: Closings are generated per city. If cities are disabled, the closing flag has no effect.
 
 ### Viewing Results
 
