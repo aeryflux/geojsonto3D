@@ -204,7 +204,7 @@ def create_border_ribbons_from_planar_source_on_top(source_obj, above, name_pref
         v1o = e.verts[0].co.copy()
         v2o = e.verts[1].co.copy()
 
-    # Project vertices to top height, embedded slightly to avoid a floating look
+        # Project vertices to top height, embedded slightly to avoid a floating look
         v1_top = v1o.normalized() * (RADIUS + above - EMBED_EPS)
         v2_top = v2o.normalized() * (RADIUS + above - EMBED_EPS)
 
