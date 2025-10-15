@@ -6,6 +6,11 @@
 res/*.glb
 res/*.blend
 res/*.blend1
+res/*.config.json
+
+# Root-level generated exports (if any)
+atlas_ico_subdiv_*.glb
+atlas_ico_subdiv_*.config.json
 
 # Keep the res directory in git
 !res/.gitkeep

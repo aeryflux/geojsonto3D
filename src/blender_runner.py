@@ -21,65 +21,99 @@ if sys.platform == 'win32':
         sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 
 
-CACHE_FILE = ".blender_cache.json"
-CONFIG_FILE = ".config_cache.json"
+# Anchor caches to the geojsonto3D project root (parent of src)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+CACHE_FILE = PROJECT_ROOT / ".blender_cache.json"
+CONFIG_FILE = PROJECT_ROOT / ".config_cache.json"
 
 PRESETS = {
     'low': {
         'ico_subdiv': 3,
         'extrude_above': 0.03,
-        'extrude_below': 0.03,
+        'extrude_below': 0.0,
         'border_width': 0.001,
-        'border_height': 0.003,
+        'border_height': 0.002,
         'enable_borders': True,
+        'enable_closing': False,
         'enable_cities': False,
     },
     'medium': {
-        'ico_subdiv': 4,
-        'extrude_above': 0.04,
-        'extrude_below': 0.04,
-        'border_width': 0.0007,
+        'ico_subdiv': 5,
+        'extrude_above': 0.05,
+        'extrude_below': 0.0,
+        'border_width': 0.0006,
         'border_height': 0.002,
         'enable_borders': True,
+        'enable_closing': False,
         'enable_cities': False,
     },
     'high': {
-        'ico_subdiv': 5,
-        'extrude_above': 0.05,
-        'extrude_below': 0.05,
+        'ico_subdiv': 7,
+        'extrude_above': 0.1,
+        'extrude_below': 0.0,
         'border_width': 0.0005,
-        'border_height': 0.0025,
+        'border_height': 0.0015,
         'enable_borders': True,
-        'enable_cities': False,
+        'enable_closing': True,
+        'enable_cities': True,
     },
     'ultra': {
-        'ico_subdiv': 6,
-        'extrude_above': 0.05,
-        'extrude_below': 0.05,
+        'ico_subdiv': 7,
+        'extrude_above': 0.1,
+        'extrude_below': 0.0,
         'border_width': 0.0005,
-        'border_height': 0.0025,
+        'border_height': 0.0015,
         'enable_borders': True,
+        'enable_closing': True,
         'enable_cities': True,
+    },
+    'custom': {
+        'ico_subdiv': 7,
+        'extrude_above': 0.1,
+        'extrude_below': 0.0,
+        'border_width': 0.0005,
+        'border_height': 0.0015,
+        'enable_borders': True,
+        'enable_closing': False,
+        'enable_cities': False,
     }
 }
 
 
 def load_cache(cache_file):
-    """Load cached data from JSON file."""
+    """Load cached data from JSON file, with legacy fallback and migration."""
     cache_path = Path(cache_file)
-    if cache_path.exists():
-        try:
-            with open(cache_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            pass
+    candidates = [cache_path]
+    # Legacy: files created in current working directory or its parent when run from elsewhere
+    try:
+        candidates.append(Path.cwd() / cache_path.name)
+    except Exception:
+        pass
+    try:
+        candidates.append(Path.cwd().parent / cache_path.name)
+    except Exception:
+        pass
+
+    for p in candidates:
+        if p.exists():
+            try:
+                with open(p, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                # Migrate to canonical location if loaded from legacy path
+                if p.resolve() != cache_path.resolve():
+                    save_cache(cache_path, data)
+                return data
+            except (json.JSONDecodeError, IOError):
+                continue
     return {}
 
 
 def save_cache(cache_file, data):
-    """Save data to JSON cache file."""
+    """Save data to JSON cache file at canonical location."""
     try:
-        with open(cache_file, 'w', encoding='utf-8') as f:
+        cache_path = Path(cache_file)
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cache_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
         return True
     except IOError:
@@ -152,13 +186,13 @@ def interactive_config():
     print("  2. medium - Balanced (ICO_SUBDIV=4, ~1-2min)")
     print("  3. high   - Quality (ICO_SUBDIV=5, ~3-5min)")
     print("  4. ultra  - Ultra (ICO_SUBDIV=6, ~10-20min)")
-    print("  5. custom - Custom parameters")
+    print("  5. custom - Custom harmonized (ICO_SUBDIV=7, no extrusion)")
 
     cached_preset = cache.get('preset', '3')
     choice = input(f"\nChoice [1-5] (default: {cached_preset}): ").strip() or cached_preset
 
-    if choice in ['1', '2', '3', '4']:
-        preset_name = ['low', 'medium', 'high', 'ultra'][int(choice) - 1]
+    if choice in ['1', '2', '3', '4', '5']:
+        preset_name = ['low', 'medium', 'high', 'ultra', 'custom'][int(choice) - 1]
         config = PRESETS[preset_name].copy()
         config['preset'] = choice
         print(f"✓ Using '{preset_name}' preset")
@@ -236,11 +270,16 @@ def build_script_args(config):
     args.extend(['--extrude-below', str(config.get('extrude_below', 0.05))])
 
     if config.get('enable_borders', True):
-        args.append('--enable-borders')
+        args.append('--enable-border')
         args.extend(['--border-width', str(config.get('border_width', 0.0005))])
         args.extend(['--border-height', str(config.get('border_height', 0.0025))])
     else:
-        args.append('--disable-borders')
+        args.append('--disable-border')
+
+    if config.get('enable_closing', False):
+        args.append('--enable-closing')
+    else:
+        args.append('--disable-closing')
 
     if config.get('enable_cities', False):
         args.append('--enable-cities')
