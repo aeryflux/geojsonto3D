@@ -211,7 +211,7 @@ def create_border_ribbons_from_planar_source_on_top(source_obj, above, name_pref
         # Edge direction on top surface
         edge_dir = (v2_top - v1_top).normalized()
 
-    # Perpendicular tangent in the local tangent plane
+        # Perpendicular tangent in the local tangent plane
         perp1 = v1_top.normalized().cross(edge_dir).normalized()
         perp2 = v2_top.normalized().cross(edge_dir).normalized()
 
