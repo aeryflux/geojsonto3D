@@ -172,7 +172,7 @@ def extrude_mesh_radially_bi(obj, depth_above, depth_below):
         for v in verts_down:
             v.co = v.co.normalized() * (RADIUS - depth_below)
 
-    # Toujours appliquer les changements
+    # Always apply the changes
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(obj.data)
     bm.free()
