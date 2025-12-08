@@ -160,14 +160,16 @@ def extrude_mesh_radially_bi(obj, depth_above, depth_below):
 
     # Extrude outward
     if depth_above > 0:
-        res_up = bmesh.ops.extrude_face_region(bm, geom=bm.faces)
+        bottom_faces = [f for f in bm.faces if all(abs(v.co.length - RADIUS) < 1e-6 for v in f.verts)]
+        res_up = bmesh.ops.extrude_face_region(bm, geom=bottom_faces)
         verts_up = [v for v in res_up["geom"] if isinstance(v, bmesh.types.BMVert)]
         for v in verts_up:
             v.co = v.co.normalized() * (RADIUS + depth_above)
 
     # Extrude inward
     if depth_below > 0:
-        res_down = bmesh.ops.extrude_face_region(bm, geom=bm.faces)
+        bottom_faces = [f for f in bm.faces if all(abs(v.co.length - RADIUS) < 1e-6 for v in f.verts)]
+        res_down = bmesh.ops.extrude_face_region(bm, geom=bottom_faces)
         verts_down = [v for v in res_down["geom"] if isinstance(v, bmesh.types.BMVert)]
         for v in verts_down:
             v.co = v.co.normalized() * (RADIUS - depth_below)
@@ -331,7 +333,7 @@ def create_closing_rings_from_planar_source_on_top(source_obj, above, name_prefi
     bpy.ops.object.shade_smooth()
     return ob
 
-def create_city_marker(name, lat_deg, lon_deg, above=EXTRUDE_ABOVE_CITY,
+def create_city_marker(name, lat_deg, lon_deg, above=EXTRUDE_ABOVE_CITY, below=EXTRUDE_BELOW_CITY,
                        radius=CITY_MARKER_RADIUS, sides=CITY_MARKER_SIDES,
                        parent=None):
     """
@@ -356,18 +358,24 @@ def create_city_marker(name, lat_deg, lon_deg, above=EXTRUDE_ABOVE_CITY,
     # Base ring verts
     verts_base = []
     verts_top = []
+    verts_bottom = []
     for i in range(sides):
         theta = 2 * math.pi * (i / sides)
         offset = t1 * math.cos(theta) * radius + t2 * math.sin(theta) * radius
         vb = base_center + offset
-        vt = base_center + offset + n * above
+        vt = vb + n * above
         verts_base.append(vb)
         verts_top.append(vt)
+        if below > 0:
+            vbt = vb - n * below
+            verts_bottom.append(vbt)
 
     # Build faces
     verts_all = verts_base + verts_top
+    if below > 0:
+        verts_all += verts_bottom
     faces = []
-    # walls
+    # walls base to top
     for i in range(sides):
         a = i
         b = (i + 1) % sides
@@ -376,11 +384,21 @@ def create_city_marker(name, lat_deg, lon_deg, above=EXTRUDE_ABOVE_CITY,
         faces.append([a, b, c, d])
     # top cap
     faces.append([sides + i for i in range(sides)])
+    # walls base to bottom and bottom cap
+    if below > 0:
+        bottom_start = len(verts_base) + len(verts_top)
+        for i in range(sides):
+            a = i
+            b = (i + 1) % sides
+            c = bottom_start + (i + 1) % sides
+            d = bottom_start + i
+            faces.append([a, b, c, d])
+        faces.append([bottom_start + i for i in range(sides)])
 
     obj = new_mesh_object(name, verts_all, faces, parent=parent, smooth=True)
     return obj
 
-def create_city_marker_at_direction(name, dir_normal: Vector, above=EXTRUDE_ABOVE_CITY,
+def create_city_marker_at_direction(name, dir_normal: Vector, above=EXTRUDE_ABOVE_CITY, below=EXTRUDE_BELOW_CITY,
                                     radius=CITY_MARKER_RADIUS, sides=CITY_MARKER_SIDES,
                                     parent=None):
     """
@@ -400,15 +418,21 @@ def create_city_marker_at_direction(name, dir_normal: Vector, above=EXTRUDE_ABOV
 
     verts_base = []
     verts_top = []
+    verts_bottom = []
     for i in range(sides):
         theta = 2 * math.pi * (i / sides)
         offset = t1 * math.cos(theta) * radius + t2 * math.sin(theta) * radius
         vb = base_center + offset
-        vt = base_center + offset + n * above
+        vt = vb + n * above
         verts_base.append(vb)
         verts_top.append(vt)
+        if below > 0:
+            vbt = vb - n * below
+            verts_bottom.append(vbt)
 
     verts_all = verts_base + verts_top
+    if below > 0:
+        verts_all += verts_bottom
     faces = []
     for i in range(sides):
         a = i
@@ -417,11 +441,20 @@ def create_city_marker_at_direction(name, dir_normal: Vector, above=EXTRUDE_ABOV
         d = sides + i
         faces.append([a, b, c, d])
     faces.append([sides + i for i in range(sides)])
+    if below > 0:
+        bottom_start = len(verts_base) + len(verts_top)
+        for i in range(sides):
+            a = i
+            b = (i + 1) % sides
+            c = bottom_start + (i + 1) % sides
+            d = bottom_start + i
+            faces.append([a, b, c, d])
+        faces.append([bottom_start + i for i in range(sides)])
 
     obj = new_mesh_object(name, verts_all, faces, parent=parent, smooth=True)
     return obj, verts_top
 
-def create_city_marker_from_face(name, face_index: int, shrink=SHRINK, above=EXTRUDE_ABOVE_CITY,
+def create_city_marker_from_face(name, face_index: int, shrink=SHRINK, above=EXTRUDE_ABOVE_CITY, below=EXTRUDE_BELOW_CITY,
                                  parent=None):
     """
     Create a triangular city marker aligned to the given icosphere face.
@@ -438,6 +471,7 @@ def create_city_marker_from_face(name, face_index: int, shrink=SHRINK, above=EXT
 
     verts_base = []
     verts_top = []
+    verts_bottom = []
     for vdir in verts_dir[:3]:
         shrunk = vdir.lerp(cdir, shrink).normalized()
         # Base sits slightly embedded into the country top to avoid z-fighting
@@ -446,9 +480,14 @@ def create_city_marker_from_face(name, face_index: int, shrink=SHRINK, above=EXT
         vt = vb + cdir * above
         verts_base.append(vb)
         verts_top.append(vt)
+        if below > 0:
+            vbt = vb - cdir * below
+            verts_bottom.append(vbt)
 
     # Build walls + top cap
     verts_all = verts_base + verts_top
+    if below > 0:
+        verts_all += verts_bottom
     faces = []
     for i in range(3):
         a = i
@@ -457,6 +496,15 @@ def create_city_marker_from_face(name, face_index: int, shrink=SHRINK, above=EXT
         d = 3 + i
         faces.append([a, b, c, d])
     faces.append([3 + i for i in range(3)])
+    if below > 0:
+        bottom_start = len(verts_base) + len(verts_top)
+        for i in range(3):
+            a = i
+            b = (i + 1) % 3
+            c = bottom_start + (i + 1) % 3
+            d = bottom_start + i
+            faces.append([a, b, c, d])
+        faces.append([bottom_start + i for i in range(3)])
 
     obj = new_mesh_object(name, verts_all, faces, parent=parent, smooth=True)
     return obj, verts_top
@@ -677,6 +725,7 @@ for name, fids in faces_by_country.items():
 
 # --- CITIES (OPTIONAL) -------------------------------------------------------
 city_objs = []
+places = []
 if ENABLE_CITIES:
     try:
         with open(GEOJSON_PLACES, encoding='utf-8') as pf:
@@ -810,9 +859,24 @@ try:
             "countries": len(country_objs),
             "cities": len(city_objs),
         },
+        "lists": {
+            "countries": sorted(faces_by_country.keys()),
+            "cities": [p['name'] for p in places],
+        },
     }
     with open(OUT_CFG, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2)
     print(f"Wrote config: {OUT_CFG}")
+
+    # Write separate lists
+    countries_file = RES_DIR / "countries.json"
+    with open(countries_file, "w", encoding="utf-8") as f:
+        json.dump(sorted(faces_by_country.keys()), f, indent=2)
+    print(f"Wrote countries list: {countries_file}")
+
+    cities_file = RES_DIR / "cities.json"
+    with open(cities_file, "w", encoding="utf-8") as f:
+        json.dump([p['name'] for p in places], f, indent=2)
+    print(f"Wrote cities list: {cities_file}")
 except Exception as e:
     print(f"Warning: failed to write config: {e}")
