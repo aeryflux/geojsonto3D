@@ -244,14 +244,21 @@ def load_geojson_features(path):
 
 def assign_cells_to_countries(cells, features):
     """
-    Assign each cell to a country via point-in-polygon on cell centroid.
+    Two-pass country assignment:
 
-    Centroid-only is the correct approach: it preserves ocean gaps
-    (Mediterranean, Caribbean) that multi-point sampling would fill in.
-    Higher subdivision levels provide enough resolution for narrow countries.
+    Pass 1 (centroid): Fast and precise — preserves ocean gaps like the
+    Mediterranean and Caribbean by only assigning cells whose centroid
+    lands inside a country polygon.
+
+    Pass 2 (vertex vote): For cells still unassigned after pass 1, test
+    all cell vertices. A country wins only if >= 2 vertices fall inside it.
+    This rescues narrow countries (Panama, El Salvador, ...) whose centroid
+    falls in the ocean but whose shape overlaps 2+ cell vertices, while
+    rejecting coastal ocean cells where only 1 vertex grazes land.
     """
     assignments = [None] * len(cells)
     total = len(cells)
+    pass2_rescued = 0
 
     for idx, cell in enumerate(cells):
         if idx % BATCH_LOG == 0:
@@ -261,6 +268,7 @@ def assign_cells_to_countries(cells, features):
         cell['lat'] = lat
         cell['lon'] = lon
 
+        # --- Pass 1: centroid ---
         for feat in features:
             minx, maxx, miny, maxy = feat["bbox"]
             if not (minx <= lon <= maxx and miny <= lat <= maxy):
@@ -270,6 +278,33 @@ def assign_cells_to_countries(cells, features):
                 cell['admin'] = feat["admin"]
                 break
 
+        if assignments[idx] is not None:
+            continue
+
+        # --- Pass 2: vertex vote (requires >= 2 vertex hits for same country) ---
+        votes = {}
+        for v in cell['verts']:
+            vlat, vlon = xyz_to_latlon(v)
+            for feat in features:
+                minx, maxx, miny, maxy = feat["bbox"]
+                if not (minx <= vlon <= maxx and miny <= vlat <= maxy):
+                    continue
+                if point_in_poly(vlon, vlat, feat["rings"][0]):
+                    key = feat["name"]
+                    votes[key] = votes.get(key, 0) + 1
+                    break  # one country per vertex
+
+        if votes:
+            best_name, best_count = max(votes.items(), key=lambda x: x[1])
+            if best_count >= 2:
+                for feat in features:
+                    if feat["name"] == best_name:
+                        assignments[idx] = feat["name"]
+                        cell['admin'] = feat["admin"]
+                        pass2_rescued += 1
+                        break
+
+    print(f"  Pass 2 rescued {pass2_rescued} narrow-country cells")
     return assignments
 
 
