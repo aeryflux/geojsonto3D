@@ -27,6 +27,7 @@ CACHE_FILE = PROJECT_ROOT / ".blender_cache.json"
 CONFIG_FILE = PROJECT_ROOT / ".config_cache.json"
 
 PRESETS = {
+    # --- ICO (triangular) presets ---
     'low': {
         'ico_subdiv': 3,
         'extrude_above': 0.03,
@@ -76,8 +77,78 @@ PRESETS = {
         'enable_borders': True,
         'enable_closing': False,
         'enable_cities': False,
-    }
+    },
+    # --- HEX (Goldberg polyhedron) presets ---
+    'hex-low': {
+        'script': 'hex',
+        'mode': 'atlas',
+        'ico_subdiv': 2,
+        'hex_label': 3,
+        'extrude_above': 0.02,
+        'extrude_below': 0.0,
+        'border_width': 0.0006,
+        'border_height': 0.002,
+        'enable_borders': True,
+    },
+    'hex-medium': {
+        'script': 'hex',
+        'mode': 'atlas',
+        'ico_subdiv': 4,
+        'hex_label': 5,
+        'extrude_above': 0.02,
+        'extrude_below': 0.0,
+        'border_width': 0.0005,
+        'border_height': 0.0015,
+        'enable_borders': True,
+    },
+    'hex-high': {
+        'script': 'hex',
+        'mode': 'atlas',
+        'ico_subdiv': 5,
+        'hex_label': 6,
+        'extrude_above': 0.02,
+        'extrude_below': 0.0,
+        'border_width': 0.0005,
+        'border_height': 0.0015,
+        'enable_borders': True,
+    },
+    'weather-hex-low': {
+        'script': 'hex',
+        'mode': 'weather',
+        'ico_subdiv': 2,
+        'hex_label': 3,
+        'extrude_above': 0.0,
+        'extrude_below': 0.0,
+        'border_width': 0.0005,
+        'border_height': 0.0015,
+        'enable_borders': True,
+    },
+    'weather-hex-medium': {
+        'script': 'hex',
+        'mode': 'weather',
+        'ico_subdiv': 4,
+        'hex_label': 5,
+        'extrude_above': 0.0,
+        'extrude_below': 0.0,
+        'border_width': 0.0005,
+        'border_height': 0.0015,
+        'enable_borders': True,
+    },
+    'weather-hex-high': {
+        'script': 'hex',
+        'mode': 'weather',
+        'ico_subdiv': 5,
+        'hex_label': 6,
+        'extrude_above': 0.0,
+        'extrude_below': 0.0,
+        'border_width': 0.0005,
+        'border_height': 0.0015,
+        'enable_borders': True,
+    },
 }
+
+# All valid preset names for CLI
+ALL_PRESET_NAMES = list(PRESETS.keys())
 
 
 def load_cache(cache_file):
@@ -262,8 +333,9 @@ def get_config(force_interactive=False, preset=None):
 
 
 def build_script_args(config):
-    """Build command line arguments for run.py from config."""
+    """Build command line arguments for run.py or hex_run.py from config."""
     args = []
+    is_hex = config.get('script') == 'hex'
 
     args.extend(['--ico-subdiv', str(config.get('ico_subdiv', 5))])
     args.extend(['--extrude-above', str(config.get('extrude_above', 0.05))])
@@ -276,17 +348,34 @@ def build_script_args(config):
     else:
         args.append('--disable-border')
 
-    if config.get('enable_closing', False):
-        args.append('--enable-closing')
+    if is_hex:
+        # Hex-specific arguments
+        if 'hex_label' in config:
+            args.extend(['--hex-label', str(config['hex_label'])])
+        if 'mode' in config:
+            args.extend(['--mode', config['mode']])
     else:
-        args.append('--disable-closing')
+        # ICO-specific arguments
+        if config.get('enable_closing', False):
+            args.append('--enable-closing')
+        else:
+            args.append('--disable-closing')
 
-    if config.get('enable_cities', False):
-        args.append('--enable-cities')
-    else:
-        args.append('--disable-cities')
+        if config.get('enable_cities', False):
+            args.append('--enable-cities')
+        else:
+            args.append('--disable-cities')
 
     return args
+
+
+def get_script_path(config, override=None):
+    """Determine which Blender script to use based on config."""
+    if override:
+        return override
+    if config.get('script') == 'hex':
+        return str(Path(__file__).parent / 'hex_run.py')
+    return str(Path(__file__).parent / 'run.py')
 
 
 def run_blender(blender_path, script_path, args, background=True):
@@ -355,8 +444,8 @@ def main():
     parser.add_argument(
         '--preset', '-p',
         type=str,
-        choices=['low', 'medium', 'high', 'ultra'],
-        help='Use quality preset (low/medium/high/ultra)'
+        choices=ALL_PRESET_NAMES,
+        help='Use quality preset (ico: low/medium/high/ultra | hex: hex-low/hex-medium/hex-high | weather: weather-hex-low/weather-hex-medium/weather-hex-high)'
     )
 
     args = parser.parse_args()
@@ -382,13 +471,16 @@ def main():
     # Get configuration
     config = get_config(force_interactive=args.configure, preset=args.preset)
 
+    # Determine script path (hex presets auto-select hex_run.py)
+    script_path = get_script_path(config, override=args.script if args.script != str(Path(__file__).parent / 'run.py') else None)
+
     # Build script arguments
     script_args = build_script_args(config)
 
     # Run Blender
     success = run_blender(
         blender_path,
-        args.script,
+        script_path,
         script_args,
         background=not args.gui
     )
@@ -397,8 +489,17 @@ def main():
         print("\n" + "="*60)
         print("✓ Generation completed successfully!")
         print("="*60)
+        is_hex = config.get('script') == 'hex'
         subdiv = config.get('ico_subdiv', 5)
-        print(f"\nOutput: atlas_ico_subdiv_{subdiv}.glb")
+        if is_hex:
+            label = config.get('hex_label', subdiv + 1)
+            mode = config.get('mode', 'atlas')
+            if mode == 'weather':
+                print(f"\nOutput: weather_hex_globe_subdiv_{label}.glb")
+            else:
+                print(f"\nOutput: atlas_hex_subdiv_{label}.glb")
+        else:
+            print(f"\nOutput: atlas_ico_subdiv_{subdiv}.glb")
         return 0
     else:
         print("\n" + "="*60)
