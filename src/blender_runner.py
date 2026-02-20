@@ -103,6 +103,7 @@ PRESETS = {
         'border_width': 0.0005,
         'border_height': 0.0015,
         'enable_borders': True,
+        'min_pass2_votes': 3,  # cells ~477km: avoid Mediterranean bridging
     },
     'hex-high': {
         'script': 'hex',
@@ -136,6 +137,7 @@ PRESETS = {
         'border_width': 0.0005,
         'border_height': 0.0015,
         'enable_borders': True,
+        'min_pass2_votes': 3,  # cells ~477km: avoid Mediterranean bridging
     },
     'weather-hex-high': {
         'script': 'hex',
@@ -357,6 +359,8 @@ def build_script_args(config):
             args.extend(['--hex-label', str(config['hex_label'])])
         if 'mode' in config:
             args.extend(['--mode', config['mode']])
+        if 'min_pass2_votes' in config:
+            args.extend(['--min-pass2-votes', str(config['min_pass2_votes'])])
     else:
         # ICO-specific arguments
         if config.get('enable_closing', False):

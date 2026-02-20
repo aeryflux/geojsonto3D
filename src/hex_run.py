@@ -50,6 +50,12 @@ EMBED_EPS = 0.0002
 ENABLE_BORDER = True
 ENABLE_EXTRUSION = True
 
+# Minimum vertex votes required for pass-2 rescue of narrow countries.
+# Use 2 for high subdivision (ico_subdiv >= 6, small cells).
+# Use 3 for medium subdivision (ico_subdiv=5) to avoid false assignments
+# across narrow water bodies like the Mediterranean (~200km wide vs ~477km cells).
+MIN_PASS2_VOTES = 2
+
 BATCH_LOG = 50            # Progress log interval
 
 # --- CLI PARSING ------------------------------------------------------------
@@ -80,6 +86,8 @@ if "--" in sys.argv:
             ENABLE_EXTRUSION = True; _i += 1
         elif _a == "--disable-extrusion":
             ENABLE_EXTRUSION = False; _i += 1
+        elif _a == "--min-pass2-votes" and _i + 1 < len(_args):
+            MIN_PASS2_VOTES = int(_args[_i + 1]); _i += 2
         else:
             _i += 1
 
@@ -296,7 +304,7 @@ def assign_cells_to_countries(cells, features):
 
         if votes:
             best_name, best_count = max(votes.items(), key=lambda x: x[1])
-            if best_count >= 2:
+            if best_count >= MIN_PASS2_VOTES:
                 for feat in features:
                     if feat["name"] == best_name:
                         assignments[idx] = feat["name"]
