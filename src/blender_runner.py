@@ -137,6 +137,7 @@ PRESETS = {
         'border_width': 0.0005,
         'border_height': 0.0015,
         'enable_borders': True,
+        'min_pass2_votes': 3,  # cells ~477km: avoid Mediterranean bridging
         # Note: at ico_subdiv=5, cells ~477km cannot reliably separate narrow seas.
         # Use weather-hex-high (ico_subdiv=6) for production-quality assignment.
     },
