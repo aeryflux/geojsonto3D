@@ -79,10 +79,13 @@ PRESETS = {
         'enable_cities': False,
     },
     # --- HEX (Goldberg polyhedron) presets ---
+    # bmesh.ops.create_icosphere(subdivisions=N) gives 10*4^(N-1)+2 vertices.
+    # ico_subdiv=3 -> 162 cells, ico_subdiv=5 -> 2562, ico_subdiv=6 -> 10242
+    # hex_label matches ico_subdiv directly.
     'hex-low': {
         'script': 'hex',
         'mode': 'atlas',
-        'ico_subdiv': 2,
+        'ico_subdiv': 3,
         'hex_label': 3,
         'extrude_above': 0.02,
         'extrude_below': 0.0,
@@ -93,7 +96,7 @@ PRESETS = {
     'hex-medium': {
         'script': 'hex',
         'mode': 'atlas',
-        'ico_subdiv': 4,
+        'ico_subdiv': 5,
         'hex_label': 5,
         'extrude_above': 0.02,
         'extrude_below': 0.0,
@@ -104,7 +107,7 @@ PRESETS = {
     'hex-high': {
         'script': 'hex',
         'mode': 'atlas',
-        'ico_subdiv': 5,
+        'ico_subdiv': 6,
         'hex_label': 6,
         'extrude_above': 0.02,
         'extrude_below': 0.0,
@@ -115,7 +118,7 @@ PRESETS = {
     'weather-hex-low': {
         'script': 'hex',
         'mode': 'weather',
-        'ico_subdiv': 2,
+        'ico_subdiv': 3,
         'hex_label': 3,
         'extrude_above': 0.0,
         'extrude_below': 0.0,
@@ -126,7 +129,7 @@ PRESETS = {
     'weather-hex-medium': {
         'script': 'hex',
         'mode': 'weather',
-        'ico_subdiv': 4,
+        'ico_subdiv': 5,
         'hex_label': 5,
         'extrude_above': 0.0,
         'extrude_below': 0.0,
@@ -137,7 +140,7 @@ PRESETS = {
     'weather-hex-high': {
         'script': 'hex',
         'mode': 'weather',
-        'ico_subdiv': 5,
+        'ico_subdiv': 6,
         'hex_label': 6,
         'extrude_above': 0.0,
         'extrude_below': 0.0,
