@@ -242,8 +242,27 @@ def load_geojson_features(path):
     return features
 
 
+def _test_point_against_features(lon, lat, features):
+    """Test a single lon/lat point against all features, return matching feature or None."""
+    for feat in features:
+        minx, maxx, miny, maxy = feat["bbox"]
+        if not (minx <= lon <= maxx and miny <= lat <= maxy):
+            continue
+        if point_in_poly(lon, lat, feat["rings"][0]):
+            return feat
+    return None
+
+
 def assign_cells_to_countries(cells, features):
-    """Assign each cell to a country via point-in-polygon on cell centroid."""
+    """
+    Assign each cell to a country using multi-point sampling.
+
+    Instead of only testing the cell centroid, we also test all cell vertices
+    and edge midpoints. This catches narrow countries (like Panama) where the
+    centroid may fall in the ocean but parts of the cell overlap land.
+
+    The country with the most sample hits wins the cell.
+    """
     assignments = [None] * len(cells)
     total = len(cells)
 
@@ -251,18 +270,46 @@ def assign_cells_to_countries(cells, features):
         if idx % BATCH_LOG == 0:
             print(f"  Assigning cells: {idx}/{total} ({idx * 100 / total:.0f}%)")
 
+        # Store centroid lat/lon for mapping output
         lat, lon = xyz_to_latlon(cell['centroid'])
         cell['lat'] = lat
         cell['lon'] = lon
 
-        for feat in features:
-            minx, maxx, miny, maxy = feat["bbox"]
-            if not (minx <= lon <= maxx and miny <= lat <= maxy):
-                continue
-            if point_in_poly(lon, lat, feat["rings"][0]):
-                assignments[idx] = feat["name"]
-                cell['admin'] = feat["admin"]
-                break
+        # Collect sample points: centroid (weight 2) + vertices + edge midpoints
+        sample_points = []
+
+        # Centroid (double weight - it's the most representative point)
+        sample_points.append((lon, lat))
+        sample_points.append((lon, lat))
+
+        # Cell vertices
+        for v in cell['verts']:
+            vlat, vlon = xyz_to_latlon(v)
+            sample_points.append((vlon, vlat))
+
+        # Edge midpoints (between consecutive vertices)
+        verts = cell['verts']
+        n = len(verts)
+        for i in range(n):
+            mid = (verts[i] + verts[(i + 1) % n]) * 0.5
+            mlat, mlon = xyz_to_latlon(mid)
+            sample_points.append((mlon, mlat))
+
+        # Vote: count hits per feature
+        votes = {}
+        for slon, slat in sample_points:
+            feat = _test_point_against_features(slon, slat, features)
+            if feat:
+                key = feat["name"]
+                if key not in votes:
+                    votes[key] = {"count": 0, "feat": feat}
+                votes[key]["count"] += 1
+
+        # Winner takes all
+        if votes:
+            winner = max(votes.values(), key=lambda v: v["count"])
+            assignments[idx] = winner["feat"]["name"]
+            cell['admin'] = winner["feat"]["admin"]
 
     return assignments
 
