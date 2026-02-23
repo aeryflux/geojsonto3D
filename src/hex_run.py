@@ -569,7 +569,10 @@ elif MODE == "weather":
     for cname, cell_list in country_cells.items():
         for local_idx, (global_idx, cell) in enumerate(cell_list):
             cell_name = f"cell_{cname}_{local_idx}"
-            create_cell_mesh(cell_name, [cell['verts']], parent=parent, merge_verts=False)
+            cell_obj = create_cell_mesh(cell_name, [cell['verts']], parent=parent, merge_verts=False)
+            # Apply extrusion to each cell
+            if ENABLE_EXTRUSION:
+                extrude_mesh_radially_bi(cell_obj, EXTRUDE_ABOVE, EXTRUDE_BELOW)
             cell_count += 1
 
         if cell_count % BATCH_LOG == 0:
